@@ -22,6 +22,8 @@ type Server struct {
 	upgrader    websocket.Upgrader
 	eventRouter *events.Router
 	httpServer  *http.Server
+	staticPath  string
+	pwaBaseURL  string
 }
 
 // NewServer creates a new WebSocket server
@@ -40,9 +42,35 @@ func NewServer(cfg *config.Config) *Server {
 	}
 }
 
+// SetStaticPath sets the path to serve static PWA files from
+func (s *Server) SetStaticPath(path string) {
+	s.staticPath = path
+}
+
+// SetPWABaseURL sets the base URL for the PWA (used in QR code)
+func (s *Server) SetPWABaseURL(url string) {
+	s.pwaBaseURL = url
+}
+
 // Start begins listening for WebSocket connections
 func (s *Server) Start() error {
+	// Serve PWA static files FIRST (lower priority)
+	if s.staticPath != "" {
+		fs := http.FileServer(http.Dir(s.staticPath))
+		// Add index.html as default
+		http.Handle("/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.URL.Path == "/" || r.URL.Path == "" {
+				http.ServeFile(w, r, s.staticPath+"/index.html")
+				return
+			}
+			fs.ServeHTTP(w, r)
+		}))
+	}
+
+	// API endpoints (higher priority)
 	http.HandleFunc("/ws", s.handleWebSocket)
+	http.HandleFunc("/qr", s.handleQRCode)
+
 	s.httpServer.Addr = ":4949"
 
 	err := s.eventRouter.Start()
@@ -80,9 +108,10 @@ func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 
 	conn, err := s.upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		log.Println(err)
+		log.Printf("WS: Upgrade failed from %s: %v", r.RemoteAddr, err)
 		return
 	}
+	log.Printf("WS: Connection upgraded from %s", r.RemoteAddr)
 
 	// Read the first message for authentication
 	_, data, err := conn.ReadMessage()
@@ -100,12 +129,13 @@ func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if auth.NewAuthenticator(s.config).ValidateCredentials(msg.DeviceID, msg.Secret) {
+		log.Printf("WS: Authentication successful for device: %s", msg.DeviceID)
 		s.deviceConn = device.NewConnection(msg.DeviceID, conn)
 		s.deviceConn.SetHandler(s.eventRouter.CreateMessageHandler())
 		s.eventRouter.SetDeviceConnection(s.deviceConn)
 		go s.deviceConn.Start()
 	} else {
-		log.Println("Authentication failed for device:", msg.DeviceID)
+		log.Printf("WS: Authentication failed for device: %s (ID: %s, Secret: [REDACTED])", msg.DeviceID, msg.DeviceID)
 		conn.Close()
 	}
 }
@@ -132,4 +162,33 @@ func (s *Server) BroadcastEvent(eventType protocol.MessageType, payload any) err
 		return err
 	}
 	return nil
+}
+
+// handleQRCode generates a QR code for easy PWA connection
+func (s *Server) handleQRCode(w http.ResponseWriter, r *http.Request) {
+	// Determine the base URL for the PWA
+	baseURL := s.pwaBaseURL
+	if baseURL == "" {
+		// Try to determine from request
+		host := r.Host
+		scheme := "http"
+		if r.TLS != nil {
+			scheme = "https"
+		}
+		baseURL = fmt.Sprintf("%s://%s", scheme, host)
+	}
+
+	// Create QR data with server info
+	qrData := fmt.Sprintf("eco://connect?server=%s&secret=%s", baseURL, s.config.SharedSecret)
+
+	// Generate QR code as PNG using an external API (qrserver.com)
+	qrURL := fmt.Sprintf("https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=%s", qrData)
+
+	// Redirect to QR code image
+	http.Redirect(w, r, qrURL, http.StatusFound)
+}
+
+// GetConnectionURL returns the WebSocket URL for clients
+func (s *Server) GetConnectionURL() string {
+	return fmt.Sprintf("ws://localhost:4949/ws")
 }

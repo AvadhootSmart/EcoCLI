@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 
 	"eco/internal/clipboard"
@@ -72,8 +73,25 @@ Run 'eco init' first if you haven't initialized the system.`,
 		//      - server := server.NewServer(cfg)
 		//      - server.Start() (run in goroutine since it blocks)
 
-		server := server.NewServer(cfg)
-		go server.Start()
+		srv := server.NewServer(cfg)
+
+		// Find and set PWA static path
+		pwaPath := findPWAPath()
+		if pwaPath != "" {
+			srv.SetStaticPath(pwaPath)
+			fmt.Printf("Serving PWA from: %s\n", pwaPath)
+		} else {
+			fmt.Println("WARNING: PWA not found, serving only API endpoints")
+		}
+
+		// Print connection info
+		fmt.Println("\n=== Eco Daemon Started ===")
+		fmt.Println("WebSocket: ws://localhost:4949/ws")
+		fmt.Printf("QR Code: http://localhost:4949/qr\n")
+		fmt.Println("PWA: http://localhost:4949/")
+		fmt.Println("============================\n")
+
+		go srv.Start()
 
 		//   4. Create and start clipboard listener
 		//      - clipboardListener := clipboard.NewListener(func(content string) {
@@ -115,10 +133,42 @@ Run 'eco init' first if you haven't initialized the system.`,
 		defer func() {
 			fmt.Println("Shutting down...")
 			clipboardListener.Stop()
-			server.Stop()
+			srv.Stop()
 			eventRouter.Stop()
 		}()
 
 		// println("daemon start")
 	},
+}
+
+func findPWAPath() string {
+	// Get current working directory
+	cwd, err := os.Getwd()
+	if err != nil {
+		cwd = ""
+	}
+
+	// Check various possible locations for the PWA
+	paths := []string{
+		"mobile/pwa",
+		"../mobile/pwa",
+		"../../mobile/pwa",
+		filepath.Join(cwd, "mobile/pwa"),
+		filepath.Join(filepath.Dir(os.Args[0]), "mobile/pwa"),
+		filepath.Join(filepath.Dir(os.Args[0]), "..", "mobile/pwa"),
+		"/usr/share/eco/pwa",
+		"/usr/local/share/eco/pwa",
+	}
+
+	for _, p := range paths {
+		absPath, err := filepath.Abs(p)
+		if err == nil {
+			info, err := os.Stat(absPath)
+			if err == nil && info.IsDir() {
+				return absPath
+			}
+		}
+	}
+
+	return ""
 }

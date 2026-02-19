@@ -27,16 +27,16 @@ func GenerateDeviceID() string {
 	return "mobile-" + str
 }
 
-// GenerateSecret creates a 32-byte random secret
+// GenerateSecret creates a 6-character random secret
 func GenerateSecret() (string, error) {
-	return GenerateRandomString(32)
+	return GenerateRandomString(5)
 }
 
-// ValidateSecret checks if a secret string is valid base64 and 32 bytes when decoded
+// ValidateSecret checks if a secret string is valid hex and 3 bytes when decoded
 func ValidateSecret(secret string) bool {
 	decoded, err := hex.DecodeString(secret)
 	if err != nil {
 		return false
 	}
-	return len(decoded) == 32
+	return len(decoded) == 3
 }

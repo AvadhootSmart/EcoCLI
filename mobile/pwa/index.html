@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#16213e">
+  <meta name="description" content="Eco - Device Companion for CLI">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Eco">
+  
+  <title>Eco - Device Companion</title>
+  
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="styles.css">
+  <link rel="icon" type="image/png" href="icons/icon-192.png">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+</head>
+<body>
+  <div class="app-container">
+    <header class="header">
+      <div class="logo">
+        <span class="logo-icon">⚡</span>
+        <h1>Eco</h1>
+      </div>
+      <div class="connection-status" id="connectionStatus">
+        <span class="status-dot"></span>
+        <span class="status-text">Connecting...</span>
+      </div>
+    </header>
+
+    <main class="main-content">
+      <section class="card connection-card">
+        <h2>Server Connection</h2>
+        <div class="form-group">
+          <label for="serverUrl">Server URL</label>
+          <input type="text" id="serverUrl" placeholder="ws://192.168.1.100:4949/ws" autocomplete="off">
+        </div>
+        <div class="form-group">
+          <label for="secret">Shared Secret</label>
+          <input type="password" id="secret" placeholder="Enter your shared secret" autocomplete="off">
+        </div>
+        <div class="connection-actions">
+          <button id="scanQrBtn" class="btn btn-secondary">Scan QR</button>
+          <button id="connectBtn" class="btn btn-primary">Connect</button>
+        </div>
+      </section>
+
+      <section class="card clipboard-card">
+        <h2>Clipboard</h2>
+        <div class="clipboard-preview" id="clipboardPreview">
+          <p class="placeholder">No clipboard data</p>
+        </div>
+        <div class="clipboard-actions">
+          <button id="copyBtn" class="btn btn-secondary" disabled>Copy from Device</button>
+          <button id="pasteBtn" class="btn btn-secondary" disabled>Paste to Device</button>
+        </div>
+      </section>
+
+      <section class="card notifications-card">
+        <h2>Notifications</h2>
+        <div class="notifications-list" id="notificationsList">
+          <p class="placeholder">No notifications</p>
+        </div>
+      </section>
+
+      <section class="card events-card">
+        <h2>Recent Events</h2>
+        <div class="events-list" id="eventsList">
+          <p class="placeholder">No events yet</p>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <p>Device ID: <span id="deviceId">-</span></p>
+    </footer>
+  </div>
+
+  <div class="toast-container" id="toastContainer"></div>
+
+  <div id="qrScannerModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>Scan QR Code</h3>
+        <button id="closeQrBtn" class="close-btn">&times;</button>
+      </div>
+      <div class="qr-scanner-container">
+        <video id="qrVideo" autoplay playsinline></video>
+        <div class="qr-overlay">
+          <div class="qr-frame"></div>
+        </div>
+      </div>
+      <p class="qr-hint">Point your camera at the QR code on the server</p>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

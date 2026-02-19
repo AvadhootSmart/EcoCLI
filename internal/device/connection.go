@@ -3,6 +3,8 @@ package device
 import (
 	"eco/internal/protocol"
 	"fmt"
+	"log"
+	"sync"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -13,8 +15,8 @@ type Connection struct {
 	deviceID  string
 	conn      *websocket.Conn
 	send      chan *protocol.Message
-	recv      chan *protocol.Message
 	stop      chan struct{}
+	stopOnce  sync.Once
 	connected bool
 	handler   func(*protocol.Message)
 }
@@ -25,7 +27,6 @@ func NewConnection(deviceID string, conn *websocket.Conn) *Connection {
 		deviceID: deviceID,
 		conn:     conn,
 		send:     make(chan *protocol.Message, 256),
-		recv:     make(chan *protocol.Message),
 		stop:     make(chan struct{}),
 	}
 }
@@ -49,7 +50,9 @@ func (c *Connection) Start() {
 // Stop gracefully closes the connection
 func (c *Connection) Stop() {
 	// c.stop <- struct{}{}
-	close(c.stop)
+	c.stopOnce.Do(func() {
+		close(c.stop)
+	})
 	c.connected = false
 	c.conn.Close()
 }
@@ -71,8 +74,9 @@ func (c *Connection) Send(msg *protocol.Message) error {
 // readPump reads messages from the WebSocket connection
 func (c *Connection) readPump() {
 	defer func() {
-		close(c.stop)
-		close(c.recv)
+		c.stopOnce.Do(func() {
+			close(c.stop)
+		})
 		c.conn.Close()
 	}()
 
@@ -89,20 +93,15 @@ func (c *Connection) readPump() {
 			return
 		}
 
-		parsedMsg, err := protocol.ParseMessage(data)
-		if err != nil {
-			return
-		}
-		if c.handler != nil {
-			c.handler(parsedMsg)
-		}
-
 		msg, err := protocol.ParseMessage(data)
 		if err != nil {
+			log.Printf("Connection: Failed to parse message from %s: %v", c.deviceID, err)
 			continue
 		}
 
-		c.recv <- msg
+		if c.handler != nil {
+			c.handler(msg)
+		}
 	}
 
 }

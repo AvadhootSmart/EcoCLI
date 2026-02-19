@@ -10,7 +10,6 @@ type Listener struct {
 	lastContent string
 	onChange    func(string)
 	running     bool
-	stop        chan struct{}
 	cmd         *exec.Cmd
 }
 
@@ -20,7 +19,6 @@ func NewListener(onChange func(content string)) *Listener {
 		lastContent: "",
 		onChange:    onChange,
 		running:     false,
-		stop:        make(chan struct{}),
 		cmd:         nil,
 	}
 }
@@ -32,7 +30,9 @@ func (l *Listener) Start() error {
 		return err
 	}
 
-	cmd := exec.Command("wl-paste", "--watch", "cat")
+	// We use wl-paste --watch to execute a command whenever the clipboard changes.
+	// We use 'printf "!\n"' as a lightweight trigger that we can scan for.
+	cmd := exec.Command("wl-paste", "--watch", "sh", "-c", "printf '!\n'")
 	l.cmd = cmd
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
@@ -43,21 +43,33 @@ func (l *Listener) Start() error {
 		return err
 	}
 
+	l.running = true
 	go func() {
 		scanner := bufio.NewScanner(stdout)
-
 		for scanner.Scan() {
-			line := scanner.Text()
+			// Trigger received! Fetch full content.
+			content, err := l.getContent()
+			if err != nil {
+				continue
+			}
 
-			if line != l.lastContent {
-				l.onChange(line)
-				l.lastContent = line
+			if content != "" && content != l.lastContent {
+				l.onChange(content)
+				l.lastContent = content
 			}
 		}
 	}()
 
-	l.running = true
 	return nil
+}
+
+func (l *Listener) getContent() (string, error) {
+	cmd := exec.Command("wl-paste", "--no-newline")
+	out, err := cmd.Output()
+	if err != nil {
+		return "", err
+	}
+	return string(out), nil
 }
 
 // Stop halts the clipboard monitoring
@@ -66,14 +78,11 @@ func (l *Listener) Stop() error {
 		return nil
 	}
 
-	close(l.stop)
-
 	if l.cmd != nil && l.cmd.Process != nil {
 		_ = l.cmd.Process.Kill()
 	}
 
 	l.running = false
-
 	return nil
 }
 

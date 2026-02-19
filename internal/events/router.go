@@ -7,6 +7,7 @@ import (
 	"eco/internal/protocol"
 	"encoding/json"
 	"fmt"
+	"log"
 )
 
 // Router handles routing system events to the connected device
@@ -50,11 +51,18 @@ func (r *Router) Start() error {
 			select {
 			case event := <-r.eventChan:
 				if r.deviceConn != nil && r.deviceConn.IsConnected() {
+					log.Printf("Router: Routing event %s to device", event.Type)
 					newMsg, err := protocol.NewMessage(event.Type, r.deviceConn.GetDeviceID(), "", event.Payload)
-					if err != nil {
-						_ = r.deviceConn.Send(newMsg)
+					if err == nil {
+						if err := r.deviceConn.Send(newMsg); err != nil {
+							log.Printf("Router: Failed to send message: %v", err)
+						}
+					} else {
+						log.Printf("Router: Failed to create message: %v", err)
 					}
 
+				} else {
+					log.Printf("Router: Dropping event %s (no device connected)", event.Type)
 				}
 			case <-r.stop:
 				return
@@ -137,6 +145,7 @@ func (r *Router) CreateMessageHandler() func(*protocol.Message) {
 
 // handleIncomingMessage processes incoming messages from the device
 func (r *Router) handleIncomingMessage(msg *protocol.Message) {
+	log.Printf("Router: Handling incoming message of type: %s", msg.Type)
 	switch msg.Type {
 	case protocol.MessageTypeClipboardSet:
 		var payload protocol.ClipboardPayload
