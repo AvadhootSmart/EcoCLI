@@ -1,0 +1,38 @@
+# Android
+android/.gradle/
+android/**/build/
+android/**/*.apk
+android/**/*.aab
+android/**/*.ap_
+android/**/*.dex
+android/local.properties
+android/*.iml
+android/.idea/
+android/**/*.hprof
+
+# Go
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+eco
+*.test
+*.out
+go.work
+
+# IDE
+.idea/
+*.iml
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Misc
+*.log
+*.tmp

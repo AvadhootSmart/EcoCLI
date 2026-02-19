@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">Eco</string>
+    <string name="notification_channel_name">Eco Service</string>
+    <string name="notification_channel_description">Background connection to Linux</string>
+</resources>
