@@ -115,29 +115,26 @@ Run 'eco init' first if you haven't initialized the system.`,
 
 		notifications.Send("Eco", "Eco daemon started")
 
-		//   5. Handle incoming messages
-		//      - clipboard.set messages → update local clipboard
-		//      - notification messages → display via notify-send
-		//      - call messages → handle call control
-
 		// Write PID file for stop command
 		err = os.WriteFile("/tmp/eco.pid", []byte(fmt.Sprintf("%d", os.Getpid())), 0644)
 		if err != nil {
 			fmt.Printf("Error writing PID file: %s\n", err)
 		}
 
-		sigChan := make(chan os.Signal, 1)
-		signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
-		<-sigChan
+		var gracefulStop = make(chan os.Signal, 1)
+		signal.Notify(gracefulStop, syscall.SIGINT, syscall.SIGTERM)
 
-		defer func() {
+		go func() {
+			sig := <-gracefulStop
+			fmt.Printf("\nReceived signal: %v\n", sig)
 			fmt.Println("Shutting down...")
 			clipboardListener.Stop()
 			srv.Stop()
 			eventRouter.Stop()
+			os.Exit(0)
 		}()
 
-		// println("daemon start")
+		select {} // Block forever
 	},
 }
 
